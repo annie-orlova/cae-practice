@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writing part 2_report_CAE trainer</title>
+<style>
+:root{font:17px/1.65 system-ui;color:#142b2c;background:#eef5f2}*{box-sizing:border-box}body{margin:0}header{background:#123d39;color:#fff;padding:2rem max(6vw,1rem)}header p,h1{margin:0}main{max-width:940px;margin:auto;padding:1rem}section,nav,details{background:white;border:1px solid #cadbd5;border-radius:14px;padding:1rem 1.3rem;margin:1rem 0}section{scroll-margin-top:1rem}h2,h3{line-height:1.25}nav{display:flex;flex-wrap:wrap;gap:.7rem}a{color:#126c5b}button{background:#126c5b;color:white;border:0;border-radius:7px;padding:.55rem .85rem;cursor:pointer}input,select,button{font:inherit}input,select{border:1px solid #668880;border-radius:6px;padding:.28rem .4rem;color:inherit;background:#fff;max-width:100%}.phrase{width:16rem}.adverb{width:10rem}.sentence{display:block;width:100%;margin:.3rem 0 1rem}.skip,.recall{color:#226457;background:#e8f4ee;border-radius:4px;padding:0 .25rem}.right{background:#e0f6e9}.wrong{background:#fff0e9}[role=status]{display:inline-block;margin-left:.75rem}.tokens{display:block;color:#34534f}
+.synonyms select{display:block;width:min(100%,36rem);min-height:3.1rem;margin:.4rem 0 1rem;padding:.5rem .75rem}
+.bank,.chunk-list,.assembled{display:flex;flex-wrap:wrap;gap:.4rem;margin:.55rem 0}
+.tile,.drop{background:#e8f4ee;color:#142b2c;border:1px solid #668880}.tile[aria-pressed=true]{outline:2px solid #126c5b}.tile:disabled{opacity:.4;cursor:default}.drop{display:inline-block;min-width:8rem;padding:.15rem .55rem}.drop.right{background:#e0f6e9}.drop.wrong,.assembled.wrong{background:#fff0e9}.assembled{min-height:2.8rem;padding:.3rem;border:1px dashed #668880;border-radius:7px}.assembled.right{background:#e0f6e9}.drop.over{outline:2px solid #126c5b}.check{margin-top:.5rem}
+.report-layout{display:grid;grid-template-columns:minmax(8rem, 29%) minmax(0,1fr);gap:clamp(.6rem,2vw,1.3rem);align-items:start}
+.report-layout .bank{position:sticky;top:.5rem;max-height:75vh;overflow:auto;display:grid;gap:.45rem;background:#f0f7f4;padding:.5rem;border-radius:8px}
+.report-layout .bank .tile{text-align:left;overflow-wrap:anywhere;line-height:1.3}
+.report-layout .drop{max-width:100%;overflow-wrap:anywhere}.report-layout .report-text{min-width:0}
+#report-nav button[aria-pressed=false]{background:#e8f4ee;color:#142b2c}
+@media(max-width:540px){.report-layout{grid-template-columns:minmax(5rem,33%) minmax(0,1fr)}.report-layout .tile{font-size:.78rem;padding:.3rem}.report-layout .drop{min-width:0;font-size:.85rem}}
+</style>
+<header><p>C1 Advanced · Writing Part 2</p><h1>Writing Part 2 · Report Trainer</h1><p>Choose a report and practise its language</p></header>
+<main>
+<nav id="report-nav" aria-label="Reports"></nav><div id="panels"></div><template id="report-panel"><details><summary>Exam task</summary><p class="prompt"></p></details>
+<nav aria-label="Exercises" class="exercise-nav"></nav>
+<div class="exercises"></div>
+<details><summary>Read the full model report</summary><div class="model"></div></details></template>
+</main>
+<script>
+const originalReport = [
+  ['Introduction', '[[p:The aim of this report is to]] evaluate the peer mentoring scheme introduced last term and suggest improvements for the next intake. [[p:The report is based on]] a survey of first-year students and follow-up interviews with six mentors.'],
+  ['Benefits', '[[p:The scheme was]] [[a:particularly]] beneficial to students who were unfamiliar with the campus. Mentors showed them how to access course materials and book appointments with tutors. [[p:The support was]] [[a:especially]] helpful in the first fortnight, when students had several deadlines to meet. [[p:An unexpected benefit was]] [[r:the development of closer links]] between students from different courses. These links offered intangible benefits, including a stronger sense of belonging.'],
+  ['Drawbacks', '[[p:The principal drawback was that]] the weekly meetings often clashed with afternoon classes. Rescheduling them necessitated additional work for the coordinator and was inconvenient for mentors with part-time jobs. The survey also suggests that some mentors were not [[a:sufficiently]] well informed about the support available for students experiencing academic difficulties.'],
+  ['Recommendations', '[[p:In light of the survey results]], [[p:I would strongly recommend that]] the college [[r:offer two meeting slots each week]]. [[p:This would allow]] students to attend without missing classes. The scheme could be made [[a:significantly]] more cost-effective by replacing printed guidance with a short online briefing. A brief follow-up survey should be conducted [[p:to determine whether]] the revised schedule has improved attendance. Overall, the scheme should continue, provided that mentors receive clearer guidance before the next intake.']
+];
+const phrases = [
+  ['The aim of this report __ to evaluate the scheme.', 'is', 'has', 'does'],
+  ['The report is based __ a survey of new students.', 'on', 'from', 'by'],
+  ['An unexpected __ of the scheme was that students felt a stronger sense of belonging.', 'benefit', 'drawback', 'target'],
+  ['The principal __ was that meetings clashed with classes.', 'drawback', 'outcome', 'insight'],
+  ['In __ of the survey results, I would suggest a change.', 'light', 'viewing', 'terms'],
+  ['This would __ students to attend without missing classes.', 'allow', 'let', 'let to'],
+  ['I would advise __ moving all meetings online.', 'against', 'from', 'about'],
+  ['The scheme could be made more cost-effective __ replacing printed material.', 'by', 'with', 'for']
+];
+const originalSynonyms = [
+ ['Rescheduling the meetings <b>necessitated</b> additional work.', 'made necessary', 'made optional', 'made easier'],
+ ['The timing was <b>inconvenient</b> for mentors with part-time jobs.', 'difficult to fit into their schedules', 'unlikely to affect their schedules', 'chosen to suit their schedules'],
+ ['The scheme offered several <b>intangible</b> benefits.', 'difficult to measure directly', 'impossible to achieve', 'likely to disappear'],
+ ['Some mentors were <b>well informed</b> about the available support.', 'familiar with the relevant facts', 'satisfied with the support', 'responsible for providing support'],
+ ['A follow-up survey could <b>determine</b> whether attendance had improved.', 'establish', 'assume', 'announce'],
+ ['Running two sessions would <b>entail</b> extra work.', 'involve', 'prevent', 'reduce']
+];
+const originalJumbles = [
+ ['The aim of this report|is to|evaluate|the mentoring scheme'],
+ ['The report|is based on|a survey|of first-year students'],
+ ['The scheme|was particularly beneficial|to students|who were unfamiliar with the campus'],
+ ['An unexpected benefit|was|the development|of closer links between students'],
+ ['The principal drawback|was that|the weekly meetings|often clashed with afternoon classes'],
+ ['Rescheduling the meetings|necessitated|additional work|for the coordinator'],
+ ['I would strongly recommend|that the college|offer two meeting slots|each week'],
+ ['A brief follow-up survey|should be conducted|to determine|whether attendance has improved']
+];
+const normalise = s => s.trim().toLowerCase().replace(/[.,!?]+$/, '').replace(/\s+/g,' ');
+const esc = s => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function field(answer, type, extra = '') {
+  return '<input autocomplete="off" spellcheck="false" class="'+type+'" aria-label="'+type+' answer" data-answer="'+esc(answer)+'" '+extra+'>';
+}
+function renderReport(report, mode) {
+  return report.map(([title, paragraph]) => '<h3>'+title+'</h3><p>'+paragraph.replace(/\[\[([par]):(.*?)\]\]/g, (_, kind, word) => {
+    if (kind === 'r') return mode === 'recall' ? '<span class="recall">________________</span>' : word;
+    if (mode === 'phrase') return kind === 'p' ? ('<button type="button" class="drop" data-answer="'+esc(word)+'" aria-label="Report phrase gap">Drop phrase</button>') : '<span class="skip">____</span>';
+    if (mode === 'adverb') return kind === 'a' ? field(word,'adverb','placeholder="'+word[0]+'…"') : word;
+    if (mode === 'recall') return '<span class="recall">'+(kind === 'a' ? word[0]+'…' : '________________')+'</span>';
+    return word;
+  })+'</p>').join('');
+}
+function choice(text, correct, ...options) {
+  const answers = Array.isArray(correct) ? correct : [correct];
+  const choices = [...answers,...options].sort((a,b)=>a.localeCompare(b));
+  return '<li><label>'+text+' <select data-answer="'+esc(answers.join('|'))+'"><option value="">Choose</option>'+choices.map(item=>'<option>'+esc(item)+'</option>').join('')+'</select></label></li>';
+}
+function tile(label, attrs = '') {
+  return '<button type="button" class="tile" '+attrs+'>'+esc(label)+'</button>';
+}
+function sentenceExercise([line], index) {
+  const chunks = line.split('|');
+  const order = index % 2 ? [2,0,3,1] : [3,1,0,2];
+  return '<li class="jumble"><div class="chunk-list">'+
+    order.map(i=>tile(chunks[i], 'data-chunk="'+i+'"')).join('')+
+    '</div><div class="assembled" aria-label="Your sentence" data-answer="'+esc(chunks.join(' '))+'"></div></li>';
+}
+function makeJumbles(report) {
+  return report.flatMap(([, paragraph]) => paragraph
+    .replace(/\[\[[par]:(.*?)\]\]/g, '$1')
+    .match(/[^.]+\./g).slice(0,2).map(sentence => {
+      const words = sentence.trim().replace(/\.$/,'').split(/\s+/);
+      return [Array.from({length:4}, (_, i) =>
+        words.slice(Math.floor(i*words.length/4), Math.floor((i+1)*words.length/4)).join(' ')
+      ).join('|')];
+    }));
+}
+function mount(panel, item, index) {
+const {report, synonyms, prompt} = item;
+const jumbles = index === 0 ? originalJumbles : makeJumbles(report);
+const taskPhrases = index === 0 ? phrases : phraseQuestions(report);
+panel.querySelector('.prompt').textContent = prompt + ' Write 220–260 words.';
+const phraseBank = report.flatMap(([,paragraph]) =>
+  [...paragraph.matchAll(/\[\[p:(.*?)\]\]/g)].map(match => match[1])
+).sort();
+const activities = [
+ ['1','Report phrases','Choose the missing word to complete each phrase.', '<ol>'+taskPhrases.map(row=>choice(...row)).join('')+'</ol>'],
+ ['2','Complete the model report','Drag a phrase into a gap, or select a phrase and then click its gap. Click a filled gap to return its phrase. Skip the shaded adverb gaps.', '<div class="report-layout"><div class="bank">'+phraseBank.map((phrase,index)=>tile(phrase,'draggable="true" data-phrase="'+index+'" aria-pressed="false"')).join('')+'</div><div class="report-text">'+renderReport(report,'phrase')+'</div></div>'],
+ ['3','Missing words','Use the first letter as a clue. Type the whole adverb, including that letter.',renderReport(report,'adverb')],
+ ['4','Find the synonym','Choose the closest meaning in this context.','<ol class="synonyms">'+synonyms.map(row=>choice(...row)).join('')+'</ol>'],
+ ['5','Unjumble the sentences','Click the chunks in order. Click a chunk in your sentence to return it and change the order.','<ol>'+jumbles.map(sentenceExercise).join('')+'</ol>'],
+ ['6','Recall aloud','Read the report aloud and reconstruct the missing phrases and adverbs from memory.',renderReport(report,'recall')]
+];
+panel.querySelector('.exercise-nav').innerHTML=activities.map(([n,title])=>'<a href="#task-'+index+'-'+n+'">'+n+'. '+title+'</a>').join('');
+panel.querySelector('.exercises').innerHTML=activities.map(([n,title,instruction,body])=>'<section id="task-'+index+'-'+n+'"><h2>'+n+'. '+title+'</h2><p>'+instruction+'</p>'+body+(n==='6'?'':'<button type="button" class="check">Check answers</button><span role="status"></span>')+'</section>').join('');
+panel.querySelector('.model').innerHTML=renderReport(report,'model');
+for (const section of panel.querySelectorAll('section')) {
+  const button=section.querySelector('.check');
+  if (!button) continue;
+  const fields=[...section.querySelectorAll('[data-answer]')];
+  button.addEventListener('click',()=>{
+    let correct=0, blank=0;
+    for(const input of fields){
+      const value=normalise(input.value ?? input.dataset.value ?? '');
+      const matches=input.dataset.answer.split('|').some(answer=>normalise(answer)===value);
+      correct+=Number(matches);
+      blank+=Number(!value);
+      input.classList.toggle('right',matches);
+      input.classList.toggle('wrong',Boolean(value)&&!matches);
+    }
+    section.querySelector('[role=status]').textContent=correct+' of '+fields.length+' correct.'+(blank?' '+blank+' left blank.':'');
+  });
+  section.addEventListener('input',event=>{
+    event.target.classList.remove('right','wrong');
+    section.querySelector('[role=status]').textContent='';
+  });
+}
+const bank = panel.querySelector('.bank');
+const bankTiles = [...bank.querySelectorAll('.tile')];
+let selected = null;
+function selectPhrase(index) {
+  selected = index;
+  for (const tile of bankTiles) tile.setAttribute('aria-pressed', String(tile.dataset.phrase === index));
+}
+function clearFeedback(element) {
+  element.classList.remove('right','wrong');
+  element.closest('section').querySelector('[role=status]').textContent='';
+}
+function returnPhrase(gap) {
+  if (gap.dataset.phrase === undefined) return;
+  bankTiles[Number(gap.dataset.phrase)].disabled = false;
+  delete gap.dataset.phrase;
+  delete gap.dataset.value;
+  gap.textContent = 'Drop phrase';
+  clearFeedback(gap);
+}
+function placePhrase(gap, index) {
+  const tile = bankTiles[Number(index)];
+  if (index === '' || index === null || !tile || tile.disabled) return;
+  returnPhrase(gap);
+  tile.disabled = true;
+  gap.dataset.phrase = index;
+  gap.dataset.value = tile.textContent;
+  gap.textContent = tile.textContent;
+  selectPhrase(null);
+  clearFeedback(gap);
+}
+for (const tile of bankTiles) {
+  tile.addEventListener('click',()=>selectPhrase(selected === tile.dataset.phrase ? null : tile.dataset.phrase));
+  tile.addEventListener('dragstart',event=>{
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-report-phrase',tile.dataset.phrase);
+  });
+}
+for (const gap of panel.querySelectorAll('.drop')) {
+  gap.addEventListener('click',()=>selected === null ? returnPhrase(gap) : placePhrase(gap,selected));
+  gap.addEventListener('dragover',event=>{
+    if (!event.dataTransfer.types.includes('application/x-report-phrase')) return;
+    event.preventDefault();
+    gap.classList.add('over');
+  });
+  gap.addEventListener('dragleave',()=>gap.classList.remove('over'));
+  gap.addEventListener('drop',event=>{
+    event.preventDefault();
+    gap.classList.remove('over');
+    placePhrase(gap,event.dataTransfer.getData('application/x-report-phrase'));
+  });
+}
+for (const row of panel.querySelectorAll('.jumble')) {
+  const source = row.querySelector('.chunk-list');
+  const assembled = row.querySelector('.assembled');
+  const chunks = [...source.children];
+  row.addEventListener('click',event=>{
+    const tile = event.target.closest('[data-chunk]');
+    if (!tile) return;
+    if (tile.parentElement === source) assembled.append(tile);
+    else {
+      const next = chunks.slice(chunks.indexOf(tile)+1).find(chunk=>chunk.parentElement === source);
+      source.insertBefore(tile,next || null);
+    }
+    assembled.dataset.value = [...assembled.children].map(chunk=>chunk.textContent).join(' ');
+    clearFeedback(assembled);
+  });
+}
+
+}
+function phraseQuestions(report) {
+  const text = report.map(([,paragraph]) => paragraph.replace(/\[\[[par]:(.*?)\]\]/g,'$1')).join(' ');
+  const patterns = [
+    ['report is to', 'to', 'for', 'by'],
+    ['aims to', 'to', 'for', 'with'],
+    ['based on', 'on', 'at', 'from'],
+    ['draws on', 'on', 'through', 'into'],
+    ['unexpected benefit', 'benefit', 'cost', 'risk'],
+    ['in light of', 'light', 'viewing', 'terms'],
+    ['would allow', 'allow', 'let', 'have'],
+    ['also suggest', 'suggest', 'offer', 'invite'],
+    ['drawback was that', 'that', 'of', 'as']
+  ];
+  return patterns.flatMap(([pattern,answer,...choices]) => {
+    const sentence = text.match(/[^.]+\./g).find(line => line.toLowerCase().includes(pattern));
+    if (!sentence) return [];
+    const start = sentence.toLowerCase().indexOf(pattern);
+    const target = start + pattern.lastIndexOf(answer);
+    return [[(sentence.slice(0,target)+'__'+sentence.slice(target+answer.length)).trim(),answer,...choices]];
+  });
+}
+const reports = [{title:"Peer mentoring",prompt:"Your college has piloted a peer mentoring scheme for new students. The principal has asked you to evaluate its benefits, identify a problem and recommend changes for the next intake.",report:originalReport,synonyms:originalSynonyms}, ...[{"title": "Digital skills programme", "prompt": "Your college has introduced a digital skills programme. The programme director has asked you to report on how effectively it prepared students for independent study, explain a weakness and recommend changes for the next term.", "report": [["Introduction", "[[p:The purpose of this report is to]] evaluate the six-week digital skills programme and recommend changes for next term. [[p:The report is based on]] learner feedback and a comparison of the tasks students completed before and after the programme."], ["Benefits", "[[p:The workshops were]] [[a:particularly]] effective in helping students assess online sources. At the beginning, many relied on the first search result they found. By the final session, most were comparing sources and checking publication dates. [[p:An unexpected benefit was]] that students began sharing reliable resources with classmates. This was [[a:especially]] helpful for those returning to education after a long break."], ["Drawbacks", "[[p:The principal drawback was that]] the last bus to the outlying villages left before the evening practice session ended. This made the final practice session inconvenient for some students, who had to arrange alternative transport. The programme also assumed that everyone was [[a:sufficiently]] familiar with spreadsheet software. Several students said that the pace of the opening session was disruptive to their learning because they could not pause to practise."], ["Recommendations", "[[p:In light of these findings]], I would strongly recommend offering two practice sessions at different times. [[p:This would allow]] students to choose a slot that fits their travel arrangements. [[p:I would also suggest]] providing a short introductory task on spreadsheets. It could make the first session [[a:considerably]] easier to follow and help tutors determine who needs additional support. [[p:Overall, the programme should continue]], with attendance and task performance reviewed after the first month."]], "synonyms": [["The revised timetable was <b>inconvenient</b> for commuters.", "difficult to fit around their commitments", "easy to overlook", "unrelated to travel"], ["The lessons helped tutors <b>determine</b> who needed support.", "establish", "assume", "announce"], ["This was an <b>unexpected benefit</b>.", "an advantage nobody had anticipated", "a requirement stated in advance", "a problem with no obvious solution"], ["The organisers wanted a more <b>cost-effective</b> approach.", "one that offers better value for money", "one that takes longer to organise", "one that needs a larger venue"], ["The <b>principal drawback</b> affected several participants.", "main disadvantage", "original purpose", "preferred solution"], ["The coordinator was <b>well informed</b> about the arrangements.", "familiar with the relevant details", "in charge of all the arrangements", "pleased with the outcome"]]}, {"title": "Staff training course", "prompt": "Your manager has asked you to evaluate a recent customer-service training course. Explain which parts were useful in your role, identify a drawback and recommend how the course should be delivered to other staff.", "report": [["Introduction", "[[p:The aim of this report is to]] assess the value of the two-day customer-service course and consider how it could be delivered to other staff. [[p:The report draws on]] my experience of the course and feedback from three colleagues who attended."], ["Benefits", "[[p:The most useful session focused on]] handling unrealistic requests. The trainer demonstrated how to acknowledge a customer’s concerns before suggesting an alternative. This approach was [[a:particularly]] effective in the role plays and has already helped me respond to complaints more confidently. [[p:An unexpected benefit was]] the opportunity to compare procedures with staff from another branch. We discovered that both teams had developed useful approaches that could be shared more [[a:widely]]."], ["Drawbacks", "[[p:The principal drawback was that]] attending the course necessitated two days away from our regular duties. Organising cover was [[a:especially]] inconvenient for branches with small teams. In addition, the introductory presentation repeated material that most participants had already covered during induction. This reduced the time available to discuss real cases brought in by colleagues."], ["Recommendations", "[[p:In light of this feedback]], I would recommend offering the introductory material online and using a single face-to-face session for practical work. [[p:This would allow]] participants to spend more time on difficult cases without increasing the cost. [[p:I would advise against]] moving the entire course online, since the feedback from partners during the role plays was [[a:extremely]] useful. [[p:A short follow-up survey could]] determine whether staff have put the techniques into practice after a month."]], "synonyms": [["Arranging staff cover <b>necessitated</b> extra planning.", "made necessary", "made optional", "made impossible"], ["The role plays were <b>particularly effective</b>.", "especially successful", "barely relevant", "unexpectedly difficult"], ["This was an <b>unexpected benefit</b>.", "an advantage nobody had anticipated", "a requirement stated in advance", "a problem with no obvious solution"], ["The organisers wanted a more <b>cost-effective</b> approach.", "one that offers better value for money", "one that takes longer to organise", "one that needs a larger venue"], ["The <b>principal drawback</b> affected several participants.", "main disadvantage", "original purpose", "preferred solution"], ["The coordinator was <b>well informed</b> about the arrangements.", "familiar with the relevant details", "in charge of all the arrangements", "pleased with the outcome"]]}, {"title": "English language camp", "prompt": "The director of a summer English camp has asked you to report on how the camp helped learners use English outside lessons, outline a problem and suggest improvements for next summer.", "report": [["Introduction", "[[p:The purpose of this report is to]] evaluate how effectively the summer camp encouraged learners to use English outside lessons and suggest changes for next year. [[p:The report is based on]] observations and exit interviews with twelve participants."], ["Benefits", "[[p:The afternoon projects were]] [[a:particularly]] beneficial because teams needed English to complete meaningful tasks. During a local history project, for instance, learners planned questions and interviewed museum staff. The activity was [[a:especially]] popular among students who rarely volunteered to speak in class. [[p:An unexpected benefit was]] that several participants continued speaking English at dinner after working together in mixed-language teams."], ["Drawbacks", "[[p:The main issue was that]] evening activities did not always give quieter students a clear role. During the quiz, the same two or three people answered most questions. Some students were also not [[a:sufficiently]] well informed about which activities were optional. This led to confusion and necessitated last-minute changes to group sizes on two evenings."], ["Recommendations", "[[p:In light of the interviews]], I would recommend assigning rotating roles in small teams so that each student has a reason to speak. [[p:This would allow]] quieter participants to contribute without having to compete for attention. [[p:I would also suggest]] giving everyone a concise schedule on arrival, with optional sessions clearly marked. [[p:Overall, the camp was]] [[a:highly]] effective at creating informal opportunities to practise English. A brief survey next summer could ascertain whether these changes have increased participation in evening activities."]], "synonyms": [["Group roles could help learners contribute <b>more readily</b>.", "more willingly", "with less accuracy", "with more hesitation"], ["The director wanted to <b>ascertain</b> whether attendance had improved.", "find out", "point out", "take for granted"], ["This was an <b>unexpected benefit</b>.", "an advantage nobody had anticipated", "a requirement stated in advance", "a problem with no obvious solution"], ["The organisers wanted a more <b>cost-effective</b> approach.", "one that offers better value for money", "one that takes longer to organise", "one that needs a larger venue"], ["The <b>principal drawback</b> affected several participants.", "main disadvantage", "original purpose", "preferred solution"], ["The coordinator was <b>well informed</b> about the arrangements.", "familiar with the relevant details", "in charge of all the arrangements", "pleased with the outcome"]]}, {"title": "Repair café pilot", "prompt": "Your council has piloted a community repair café. The coordinator has asked you to assess its benefits for residents, explain the main operational problem and advise whether it should run regularly.", "report": [["Introduction", "[[p:This report aims to]] assess the council’s three-month repair café pilot and determine whether it should become a regular service. [[p:The report draws on]] repair records and a survey of residents who brought items to the café."], ["Benefits", "[[p:The pilot was]] [[a:particularly]] effective in helping residents keep everyday items in use. Volunteers repaired forty-eight items, including lamps, toys and bicycles. Participants also learnt how to deal with simple faults themselves. [[p:An unexpected benefit was]] that several residents returned as volunteers after attending the first session. The café therefore offered intangible benefits as well as practical ones, including stronger links among neighbours who had previously had little contact."], ["Drawbacks", "[[p:The principal drawback was that]] demand was [[a:substantially]] higher than expected. Operating on a first-come, first-served basis entailed long waits, and some residents left before a volunteer was available. The venue was also [[a:inconveniently]] located for people without a car. Several survey respondents said they would attend more often if the café were closer to public transport."], ["Recommendations", "[[p:In light of the survey results]], I would recommend running the café once a month at the library. [[p:This would allow]] more residents to reach it by bus. [[p:I would also suggest]] introducing a simple booking system while reserving a few places for people who arrive without an appointment. [[p:This could make]] waiting times [[a:considerably]] shorter. After three more sessions, the council should review attendance and waiting times before committing to a permanent timetable."]], "synonyms": [["The drop-in format <b>entailed</b> long waits.", "involved", "prevented", "shortened"], ["Demand was <b>substantially</b> higher than expected.", "considerably", "slightly", "temporarily"], ["This was an <b>unexpected benefit</b>.", "an advantage nobody had anticipated", "a requirement stated in advance", "a problem with no obvious solution"], ["The organisers wanted a more <b>cost-effective</b> approach.", "one that offers better value for money", "one that takes longer to organise", "one that needs a larger venue"], ["The <b>principal drawback</b> affected several participants.", "main disadvantage", "original purpose", "preferred solution"], ["The coordinator was <b>well informed</b> about the arrangements.", "familiar with the relevant details", "in charge of all the arrangements", "pleased with the outcome"]]}]];
+const tabs = document.querySelector('#report-nav');
+const panels = document.querySelector('#panels');
+const template = document.querySelector('#report-panel');
+const mounted = new Map();
+function showReport(index) {
+  if (!mounted.has(index)) {
+    const panel = document.createElement('article');
+    panel.append(template.content.cloneNode(true));
+    panels.append(panel);
+    mount(panel,reports[index],index);
+    mounted.set(index,panel);
+  }
+  for (const [key,panel] of mounted) panel.hidden = key !== index;
+  [...tabs.children].forEach((tab,i)=>tab.setAttribute('aria-pressed',String(i===index)));
+}
+reports.forEach(({title},index) => {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.textContent = (index+1)+'. '+title;
+  button.addEventListener('click',()=>showReport(index));
+  tabs.append(button);
+});
+showReport(0);
+</script>
