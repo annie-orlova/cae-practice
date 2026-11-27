@@ -25,13 +25,37 @@
 .spoiler[aria-pressed=true]{background:#e8f4ee;color:#164738}
 .recall-controls{display:flex;gap:.5rem;flex-wrap:wrap}
 .recall-controls button[aria-pressed=false]{background:#e8f4ee;color:#142b2c}
+[hidden]{display:none!important}
+.profile-form,.profile-bar,.report-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem}
+.progress-scroll{overflow-x:auto}.progress-table{border-collapse:collapse;width:100%;font-size:.91rem}
+.progress-table caption{text-align:left;margin-bottom:.65rem;font-weight:600}
+.progress-table th,.progress-table td{text-align:left;border-bottom:1px solid #cadbd5;padding:.55rem;vertical-align:top;min-width:7rem}
+.progress-table th[scope=row]{min-width:10rem}
+.progress-table .done{color:#155b39;font-weight:600}
+button:disabled{cursor:default;opacity:.55}
+.secondary{color:#123d39;background:#e8f4ee}
 </style>
 <header><p>C1 Advanced · Writing Part 2</p><h1>Writing Part 2 · Report Trainer</h1><p>Choose a report and practise its language</p></header>
 <main>
-<nav id="report-nav" aria-label="Reports"></nav><div id="panels"></div><template id="report-panel"><details><summary>Exam task</summary><p class="prompt"></p></details>
+<section aria-labelledby="profile-heading">
+<h2 id="profile-heading">Practice profile</h2>
+<form class="profile-form" id="profile-form">
+<label for="profile-name">Name</label>
+<input id="profile-name" maxlength="40" required autocomplete="off">
+<button type="submit">Sign in</button>
+</form>
+<div class="profile-bar" id="profile-bar" hidden>
+<strong id="active-name"></strong><button type="button" class="secondary" id="switch-profile">Switch profile</button>
+</div>
+<p id="profile-status" role="status">Use the same name on this browser to return to your progress.</p>
+</section>
+<div id="practice" hidden>
+<details open><summary>My progress</summary><div class="progress-scroll" id="progress"></div></details>
+<nav id="report-nav" aria-label="Reports"></nav><div id="panels"></div><template id="report-panel"><div class="report-toolbar"><button type="button" class="secondary restart">Start report again</button></div><details><summary>Exam task</summary><p class="prompt"></p></details>
 <nav aria-label="Exercises" class="exercise-nav"></nav>
 <div class="exercises"></div>
 <details><summary>Read the full model report</summary><div class="model"></div></details></template>
+</div>
 </main>
 <script>
 const originalReport = [
@@ -172,11 +196,22 @@ const activities = [
  ['6','Recall aloud','Read the report aloud and reconstruct the missing phrases and adverbs from memory.', '<div class="recall-controls"><button type="button" data-level="easy" aria-pressed="true">1 · Fewer gaps</button><button type="button" data-level="hard" aria-pressed="false">2 · More gaps</button></div><div class="recall-text">'+renderReport(report,'recall-easy')+'</div>' ]
 ];
 panel.querySelector('.exercise-nav').innerHTML=activities.map(([n,title])=>'<a href="#task-'+index+'-'+n+'">'+n+'. '+title+'</a>').join('');
-panel.querySelector('.exercises').innerHTML=activities.map(([n,title,instruction,body])=>'<section id="task-'+index+'-'+n+'"><h2>'+n+'. '+title+'</h2><p>'+instruction+'</p>'+body+(n==='6'?'':'<button type="button" class="check">Check answers</button><span role="status"></span>')+'</section>').join('');
+panel.querySelector('.exercises').innerHTML=activities.map(([n,title,instruction,body])=>'<section id="task-'+index+'-'+n+'"><h2>'+n+'. '+title+'</h2><p>'+instruction+'</p>'+body+(n==='6'?'<button type="button" class="recall-done">Mark this round as practised</button><span role="status"></span>':'<button type="button" class="check">Check answers</button><span role="status"></span>')+'</section>').join('');
 panel.querySelector('.model').innerHTML=renderReport(report,'model');
 for (const section of panel.querySelectorAll('section')) {
   const button=section.querySelector('.check');
-  if (!button) continue;
+  const task = Number(section.id.split('-').at(-1)) - 1;
+  if (!button) {
+    const recallButton = section.querySelector('.recall-done');
+    recallButton.addEventListener('click', () => {
+      const level = section.querySelector('[data-level][aria-pressed=true]').dataset.level;
+      recordAttempt(index, task, true, null, level);
+      section.dataset[level+'Recorded'] = 'true';
+      section.querySelector('[role=status]').textContent = 'Recall round recorded.';
+      recallButton.disabled = true;
+    });
+    continue;
+  }
   const fields=[...section.querySelectorAll('[data-answer]')];
   button.addEventListener('click',()=>{
     let correct=0, blank=0;
@@ -191,9 +226,14 @@ for (const section of panel.querySelectorAll('section')) {
         input.setAttribute('aria-label',input.dataset.value+(matches ? ', correct' : ', incorrect'));
       }
     }
+    if (blank < fields.length) {
+      recordAttempt(index, task, correct === fields.length, {correct, total:fields.length});
+      button.disabled = true;
+    }
     section.querySelector('[role=status]').textContent=correct+' of '+fields.length+' correct.'+(blank?' '+blank+' left blank.':'');
   });
   section.addEventListener('input',event=>{
+    button.disabled = false;
     event.target.classList.remove('right','wrong');
     section.querySelector('[role=status]').textContent='';
   });
@@ -211,6 +251,9 @@ panel.addEventListener('click', event => {
       button.setAttribute('aria-pressed', String(button === level));
     }
     panel.querySelector('.recall-text').innerHTML = renderReport(report,'recall-'+level.dataset.level);
+    const section = level.closest('section');
+    section.querySelector('.recall-done').disabled = section.dataset[level.dataset.level+'Recorded'] === 'true';
+    section.querySelector('[role=status]').textContent = '';
   }
 });
 const bank = panel.querySelector('.bank');
@@ -222,7 +265,9 @@ function selectPhrase(index) {
 }
 function clearFeedback(element) {
   element.classList.remove('right','wrong');
-  element.closest('section').querySelector('[role=status]').textContent='';
+  const section = element.closest('section');
+  section.querySelector('.check').disabled = false;
+  section.querySelector('[role=status]').textContent='';
 }
 function returnPhrase(gap) {
   if (gap.dataset.phrase === undefined) return;
@@ -317,6 +362,12 @@ function showReport(index) {
     panels.append(panel);
     mount(panel,reports[index],index);
     mounted.set(index,panel);
+    panel.querySelector('.restart').addEventListener('click', () => {
+      panel.remove();
+      mounted.delete(index);
+      showReport(index);
+      mounted.get(index).querySelector('.restart').focus();
+    });
   }
   for (const [key,panel] of mounted) panel.hidden = key !== index;
   [...tabs.children].forEach((tab,i)=>tab.setAttribute('aria-pressed',String(i===index)));
@@ -328,5 +379,98 @@ reports.forEach(({title},index) => {
   button.addEventListener('click',()=>showReport(index));
   tabs.append(button);
 });
-showReport(0);
+const storageKey = 'cae-report-trainer.profiles.v1';
+const taskNames = ['Report phrases','Model report','Missing words','Target words','Unjumble','Recall aloud'];
+const form = document.querySelector('#profile-form');
+const profileBar = document.querySelector('#profile-bar');
+const status = document.querySelector('#profile-status');
+const practice = document.querySelector('#practice');
+const nameInput = document.querySelector('#profile-name');
+
+function readProfiles() {
+  try {
+    return JSON.parse(localStorage.getItem(storageKey)) ?? {active:null, profiles:{}};
+  } catch {
+    return {active:null, profiles:{}};
+  }
+}
+const state = readProfiles();
+let profile = null;
+function saveProfiles() {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(state));
+    return true;
+  } catch {
+    status.textContent = 'This browser could not save your progress. It is available until you close or reload the page.';
+    return false;
+  }
+}
+function recordAttempt(report, task, complete, score, level) {
+  const key = report+'-'+task;
+  const result = profile.results[key] ??= {attempts:0, done:false};
+  result.attempts++;
+  result.done ||= complete;
+  if (score) result.lastScore = score;
+  if (level) {
+    result.levels ??= {easy:0, hard:0};
+    result.levels[level]++;
+  }
+  saveProfiles();
+  renderProgress();
+}
+function renderProgress() {
+  const results = Object.values(profile.results);
+  const done = results.filter(result=>result.done).length;
+  const attempts = results.reduce((sum,result)=>sum+result.attempts,0);
+  const rows = reports.map(({title},i) => {
+    const entries = taskNames.map((_,j)=>profile.results[i+'-'+j]);
+    const completed = entries.filter(result=>result?.done).length;
+    return '<tr><th scope="row">'+esc(title)+'<br>'+completed+' / '+taskNames.length+'</th>'+
+      entries.map(progressCell).join('')+'</tr>';
+  }).join('');
+  document.querySelector('#progress').innerHTML = '<table class="progress-table"><caption>'+
+    done+' / '+(reports.length*taskNames.length)+' tasks completed · '+attempts+' attempts</caption>'+
+    '<thead><tr><th scope="col">Report</th>'+taskNames.map(name=>'<th scope="col">'+name+'</th>').join('')+
+    '</tr></thead><tbody>'+rows+'</tbody></table>';
+}
+function progressCell(result) {
+  if (!result) return '<td>Not started</td>';
+  const score = result.lastScore;
+  const details = result.levels ? '<br>Fewer gaps: '+result.levels.easy+'<br>More gaps: '+result.levels.hard :
+    score ? '<br>Last score: '+score.correct+'/'+score.total : '';
+  return '<td><span'+(result.done?' class="done"':'')+'>'+(result.done?'✓ Completed':'In progress')+
+    '</span><br>'+result.attempts+(result.attempts===1?' attempt':' attempts')+details+'</td>';
+}
+function signIn(key) {
+  state.active = key;
+  profile = state.profiles[key];
+  document.querySelector('#active-name').textContent = profile.name;
+  form.hidden = true;
+  profileBar.hidden = false;
+  practice.hidden = false;
+  if (saveProfiles()) status.textContent = 'Progress saves in this browser. Start a report again to practise from a clean slate.';
+  renderProgress();
+  showReport(0);
+}
+form.addEventListener('submit', event=>{
+  event.preventDefault();
+  const name = nameInput.value.trim().replace(/\s+/g,' ');
+  if (!name) return;
+  const key = 'name:'+name.toLowerCase();
+  state.profiles[key] ??= {name, results:{}};
+  signIn(key);
+});
+document.querySelector('#switch-profile').addEventListener('click',()=>{
+  practice.hidden = true;
+  profileBar.hidden = true;
+  form.hidden = false;
+  state.active = null;
+  profile = null;
+  for (const panel of mounted.values()) panel.remove();
+  mounted.clear();
+  saveProfiles();
+  nameInput.value = '';
+  nameInput.focus();
+});
+if (state.active && state.profiles[state.active]) signIn(state.active);
 </script>
